@@ -1,0 +1,19 @@
+Package: usfrbcp
+Type: Package
+Title: Fetch the US Federal Reserve Bank's commercial paper data.
+Version: 1.0.0
+Date: 2014-06-14
+Author: Matt Barry <mrb@softisms.com>
+Maintainer: Matt Barry <mrb@softisms.com>
+Description: Provides functions for downloading the commercial paper data from
+    the US Federal Reserve Bank's web site, then converting the original XML
+    into data frames for the various data histories.
+Depends:
+    R (>= 3.0.3)
+License: MIT + file LICENSE
+URL: https://github.com/mrbcuda/usfrbcp
+BugReports: https://github.com/mrbcuda/usfrbcp/issues
+Imports:
+    XML,
+    plyr
+Roxygen: list(wrap = FALSE)
