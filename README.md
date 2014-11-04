@@ -1,9 +1,15 @@
-US Federal Reserve Bank Commercial Paper
-========================================
+---
+output: pdf_document
+---
 
-This R package ```usfrbcp``` provides functions for processing the US Federal Reserve Bank's commercial paper data.  The main function posts a query to the US Federal Reserve Bank's web site.  By default the download includes commercial paper rates, volumes, and outstanding issue counts, variously in daily, weekly, or monthly frequency. The download data from the service is in compressed XML format.  The query function transforms that data into a list of products.  Several supporting functions then convert these lists by data type into smaller lists of data frames for convenient usage.  The data frames can be used as-is or converted easily to a time series format such as ```xts```. 
+[![Build Status](https://travis-ci.org/mrbcuda/usfrbcp.png?branch=master)](https://travis-ci.org/mrbcuda/usfrbcp)
 
-The main function retrieves the commercial paper data:
+Commercial Paper History
+========================
+
+This R package ```usfrbcp``` provides functions for processing the US Federal Reserve Bank's commercial paper history data.  The main function posts a query to the US Federal Reserve Bank's web site.  By default the download includes commercial paper rates, volumes, and outstanding issue counts, variously in daily, weekly, or monthly frequency. The download data from the service is in compressed XML format.  The query function transforms that data into a list of products.  Several supporting functions then convert these lists by data type into smaller lists of data frames for convenient usage.  The data frames can be used as-is or converted easily to a time series format such as ```xts```. 
+
+The main function retrieves the commercial paper data history archive from the web service and extracts it into a collection of lists:
 
 ```{r}
 require(usfrbcp)
@@ -39,7 +45,7 @@ xyplot.ts(xt,scales=list(y=list(relation="same")),ylab="Rate (%)")
 xyplot.ts(xt,superpose=TRUE,auto.key=list(columns=4),ylab="Yield (%)")
 ```
 
-![plotg](man/figures/grouped.png)
+![plotg](man/figures/yields.png)
 
 One might also plot data from the volume series, which also contains dollar values:
 
@@ -58,8 +64,37 @@ xyplot.ts(na.omit(xts(v$df,order.by=as.Date(rownames(v$df)))),
 
 ![plotv](man/figures/vol1.png)
 
-Series Content
-=============
+
+Using ```dplyr``` and ```tidyr``` we can easily create some ```ggplot2``` graphics.  Using the year-end series as an example:
+
+```{r}
+require(ggplot2)
+require(dplyr)
+require(tidyr)
+require(scales)
+
+rv = getCommercialPaperYearend(cp,"text")
+df <- mergeSeries(rv)
+df <- df %>% 
+      mutate(Date=as.Date(rownames(df))) %>% 
+      gather(Product,Outstanding,starts_with("DT"))
+
+# p <- ggplot(df,aes(x=Date,y=Outstanding,group=Product))
+# p + geom_line(aes(colour=Product)) + scale_x_date()
+
+p <- ggplot(df,aes(x=Date,y=Outstanding))
+p + geom_line(aes(colour=Product)) +
+    facet_wrap(~Product,ncol=2,scales="fixed") +
+    scale_x_date(limits=c(as.Date("2010-1-1"),max(df$Date))) +
+    theme(legend.position="none") +
+    ggtitle("Commercial Paper Outstanding Year End")
+  
+```
+
+![plotv](man/figures/yegg.png)
+
+Series Descriptions
+===================
 
 RATES is data set with 24 Series:
 
