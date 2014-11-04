@@ -1,4 +1,4 @@
-#' @title Fetch US Federal Reserve Bank commercial paper history
+#' @title Fetch Commercial Paper Data History
 #' @description Fetches the US Federal Reserve Bank's commercial paper history and provides
 #' transforms into data frames.
 #' @details Downloads the US Federal Reserve Bank's commercial paper rate, volume, and 

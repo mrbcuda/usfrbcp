@@ -1,11 +1,24 @@
-#' @title Get commercial paper
-#' @description Fetch the US Federal Reserve Bank's Commercial Paper Data
+#' @title Get commercial paper history.
+#' @description Fetches the US Federal Reserve Bank's commercial paper data, parses and returns as list.
+#' @details Downloads from the Federal Reserve Bank's web service a zip file of several XML and XSD files 
+#'   related to commercial paper rates, volumes, and outstanding quantities over time.  Extracts the
+#'   commercial paper XML files in a temporary directory and parses its XML into a list. The web service
+#'   URL used is \url{http://www.federalreserve.gov/datadownload/Output.aspx?rel=CP&filetype=zip}.
 #' @author Matt Barry <mrb@@softisms.com>
 #' @export
 #' @importFrom XML xmlParse xmlToList
-#' @return Returns the document represented as a list of class \code{usfrbcp}.
+#' @importFrom utils unzip download.file
+#' @return Returns the many data series as a list of class \code{usfrbcp}.  
+#' @seealso \code{\link{getCommercialPaperRates}} for extracting commercial paper rates, 
+#' \code{\link{getCommercialPaperRatesOld}} for extracting old commercial paper rates, 
+#' \code{\link{getCommercialPaperVolumes}} for extracting commercial paper volumes, 
+#' \code{\link{getCommercialPaperOutstanding}} for extracting commercial paper outstanding, 
+#' \code{\link{getCommercialPaperOutstandingOld}} for extracting old commercial paper outstanding, 
+#' \code{\link{getCommercialPaperYearend}} for extracting commercial paper outstanding at year end, 
+#' \code{\link{mergeSeries}} for merging list elements into a data frame.
+#' @family aggregate functions
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' summary(cp)
 #' }
@@ -14,11 +27,11 @@ getCommercialPaper <- function() {
   resource <- "http://www.federalreserve.gov/datadownload/Output.aspx?rel=CP&filetype=zip"
   td <- tempdir()
   tf <- tempfile(tmpdir=td,fileext=".zip")
-  download.file(resource,tf)
+  utils::download.file(resource,tf)
   fname <- "CP_data.xml"
-  unzip(tf,files=fname,overwrite=TRUE)
+  utils::unzip(tf,files=fname,overwrite=TRUE,exdir=td)
   fpath=file.path(td,fname)
-  doc <- xmlParse(fpath)
+  doc <- XML::xmlParse(fpath)
   unlink(tf)
   if (is.null(doc)) {
     warning(paste("Could not parse the location",fpath))
@@ -27,27 +40,34 @@ getCommercialPaper <- function() {
   
   message("Download and parse complete.  Converting to list...")
   
-  rv <- xmlToList(doc)
+  rv <- XML::xmlToList(doc)
   message("List conversion complete.")
+  unlink(fpath)
   
   class(rv) <- "usfrbcp"
   return(rv)
 }
 
-#' @title Merge series
-#' @description Combines the series lists into a data frame with series as columns 
+#' @title Merge commercial paper series.
+#' @description Combines the commercial paper series lists into a data frame with series as columns 
 #' and dates as row names.
 #' @param data an extracted commercial paper series from rates, volume, outstanding, etc.
-#' @return if data has class \code{usfrbcpo}, which contains both monthly and 
-#' weekly series, then the return value is a list of two data frames 
-#' \code{weekly} and \code{monthly}; otherwise, the return value is a data frame.
+#' @return If \code{data} has class \code{usfrbcpo}, which contains both monthly and 
+#'   weekly series, then the return value is a list of two data frames 
+#'   \code{weekly} and \code{monthly}; otherwise, the return value is a data frame.
 #' @export 
+#' @seealso \code{\link{getCommercialPaperRates}} for extracting commercial paper rates, 
+#' \code{\link{getCommercialPaperRatesOld}} for extracting old commercial paper rates, 
+#' \code{\link{getCommercialPaperVolumes}} for extracting commercial paper volumes, 
+#' \code{\link{getCommercialPaperOutstanding}} for extracting commercial paper outstanding, 
+#' \code{\link{getCommercialPaperOutstandingOld}} for extracting old commercial paper outstanding, 
+#' \code{\link{getCommercialPaperYearend}} for extracting commercial paper outstanding at year end.
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' rates <- getCommercialPaperRates(cp,"text")
-#' table <- mergeSeries(rates)
-#' head(table)
+#' rt <- mergeSeries(rates)
+#' tail(rt)
 #' }
 mergeSeries <- function(data) {
   if ( class(data) == "usfrbcpo" ) {
@@ -68,18 +88,17 @@ mergeSeries <- function(data) {
 }
 
 
-#' @title Extract commercial paper series
+#' @title Extract commercial paper series.
 #' @details Extracts a given series from the commercial paper data sets. 
-#' Not meant to be used directly, but useful if class name assignment unwanted.  
+#' Not meant to be used directly, but useful if class name assignment is unwanted.  
 #' Substitutes observation value \code{NA} for any off-nominal observation status indicators.
 #' @param x commercial paper data sets as from \code{\link{getCommercialPaper}}.
-#' @param seriesIndex the series number from within the data set
-#' @param columnName name for the extracted observation value column
-#' @param progressBar optional progress bar for \code{llply} progress monitoring, default none; see \code{plyr::create_progress_bar}
-#' @return list containing prepared date and series data frame elements
+#' @param seriesIndex the series number from within the data set.
+#' @param columnName name for the extracted observation value column.
+#' @param progressBar optional progress bar for \code{llply} progress monitoring, default none; see \code{plyr::create_progress_bar}.
+#' @return Returns a list containing prepared date and series data frame elements.
 #' @importFrom plyr llply ldply
-#' @seealso \code{\link{getCommercialPaper}}, 
-#' \code{\link{mergeSeries}}
+#' @seealso \code{\link{getCommercialPaper}}, \code{\link{mergeSeries}}
 extractCommercialPaperSeries <- function(x,seriesIndex,columnName,progressBar="none") {
   prepared <- x$Header$Prepared # extract prepared date
   series <- x[[seriesIndex]] # extract the data series 
@@ -139,11 +158,12 @@ extractCommercialPaperSeries <- function(x,seriesIndex,columnName,progressBar="n
 }
 
 
-#' @title Extract the commercial paper rates data set
-#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}
+#' @title Extract commercial paper rates data.
+#' @description Extracts the commercial paper rates series from the commercial paper data set.
+#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}.
 #' @param progressBar optional progress bar for \code{llply} progress monitoring, 
-#' default none; see {\code{plyr::create_progress_bar}}
-#' @return list containing data frame for each series, class \code{usfrbcpr}
+#' default none; see {\code{plyr::create_progress_bar}}.
+#' @return Returns a list containing a data frame for each series, class \code{usfrbcpr}.
 #' @export
 #' @seealso \code{\link{getCommercialPaper}}, 
 #' \code{\link{getCommercialPaperRatesOld}}, 
@@ -153,7 +173,7 @@ extractCommercialPaperSeries <- function(x,seriesIndex,columnName,progressBar="n
 #' \code{\link{getCommercialPaperYearend}}, 
 #' \code{\link{mergeSeries}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' rates <- getCommercialPaperRates(cp,"text")
 #' summary(rates)
@@ -167,11 +187,10 @@ getCommercialPaperRates <- function(cp,progressBar="none") {
   return(rv)
 }
 
-#' @title Extract the commercial paper volumes data set
-#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}
-#' @param progressBar optional progress bar for \code{llply} progress monitoring, 
-#' default none; see {\code{plyr::create_progress_bar}}
-#' @return list containing data frame for each series, class \code{usfrbcpv}
+#' @title Extract the commercial paper volumes data.
+#' @description Extracts the commercial paper volume series from the commercial paper data set.
+#' @inheritParams getCommercialPaperRates
+#' @return Returns a list containing data frame for each series, class \code{usfrbcpv}
 #' @export
 #' @seealso \code{\link{getCommercialPaper}}, 
 #' \code{\link{getCommercialPaperRates}}, 
@@ -181,7 +200,7 @@ getCommercialPaperRates <- function(cp,progressBar="none") {
 #' \code{\link{getCommercialPaperOutstandingOld}}, 
 #' \code{\link{mergeSeries}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' volumes <- getCommercialPaperVolumes(cp,"text")
 #' summary(volumes)
@@ -195,11 +214,10 @@ getCommercialPaperVolumes <- function(cp,progressBar="none") {
   return(rv)
 }
 
-#' @title Extract the commercial paper outstanding data set
-#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}
-#' @param progressBar optional progress bar for \code{llply} progress monitoring, 
-#' default none; see {\code{plyr::create_progress_bar}}
-#' @return list containing data frame for each series, class \code{usfrbcpo}
+#' @title Extract the commercial paper outstanding data.
+#' @description Extracts the commercial paper outstanding series from the commercial paper data set.
+#' @inheritParams getCommercialPaperRates
+#' @return list containing data frame for each series, class \code{usfrbcpo}.
 #' @export
 #' @seealso \code{\link{getCommercialPaper}}, 
 #' \code{\link{getCommercialPaperRates}}, 
@@ -209,7 +227,7 @@ getCommercialPaperVolumes <- function(cp,progressBar="none") {
 #' \code{\link{getCommercialPaperYearend}}, 
 #' \code{\link{mergeSeries}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' outstanding <- getCommercialPaperOutstanding(cp,"text")
 #' summary(outstanding)
@@ -223,11 +241,10 @@ getCommercialPaperOutstanding <- function(cp,progressBar="none") {
   return(rv)
 }
 
-#' @title Extract the commercial paper outstanding year end data set
-#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}
-#' @param progressBar optional progress bar for \code{llply} progress monitoring, 
-#' default none; see {\code{plyr::create_progress_bar}}
-#' @return list containing data frame for each series, class \code{usfrbcpy}
+#' @title Extract the commercial paper outstanding year end data.
+#' @description Extracts the commercial paper year end series from the commercial paper data set.
+#' @inheritParams getCommercialPaperRates
+#' @return Returns a list containing data frame for each series, class \code{usfrbcpy}.
 #' @export
 #' @seealso \code{\link{getCommercialPaper}}, 
 #' \code{\link{getCommercialPaperRates}}, 
@@ -237,7 +254,7 @@ getCommercialPaperOutstanding <- function(cp,progressBar="none") {
 #' \code{\link{getCommercialPaperOutstandingOld}}, 
 #' \code{\link{mergeSeries}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' yearend <- getCommercialPaperYearend(cp,"text")
 #' summary(yearend)
@@ -251,12 +268,12 @@ getCommercialPaperYearend <- function(cp,progressBar="none") {
   return(rv)
 }
 
-#' @title Extract the commercial paper outstanding (old) data set.
-#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}
-#' @param progressBar optional progress bar for \code{llply} progress monitoring, default none; see {\code{plyr::create_progress_bar}}
-#' @return list containing data frame for each series, class \code{usfrbcpw}
+#' @title Extract the commercial paper outstanding (old) data.
+#' @description Extracts the commercial paper outstanding (old) series from the commercial paper data set.
+#' @inheritParams getCommercialPaperRates
+#' @return Returns a list containing data frame for each series, class \code{usfrbcpw}.
 #' @export
-#' @seealso \code{\link{getCommercialPaper}}, 
+#' @seealso \code{\link{getCommercialPaper}},
 #' \code{\link{getCommercialPaperRates}}, 
 #' \code{\link{getCommercialPaperRatesOld}}, 
 #' \code{\link{getCommercialPaperVolumes}}, 
@@ -264,7 +281,7 @@ getCommercialPaperYearend <- function(cp,progressBar="none") {
 #' \code{\link{getCommercialPaperYearend}},
 #' \code{\link{mergeSeries}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' outstanding <- getCommercialPaperOutstandingOld(cp,"text")
 #' summary(outstanding)
@@ -278,10 +295,10 @@ getCommercialPaperOutstandingOld <- function(cp,progressBar="none") {
   return(rv)
 }
 
-#' @title Extract the commercial paper rates (old) data set.
-#' @param cp commercial paper data as retrieved by \code{getCommercialPaper()}
-#' @param progressBar optional progress bar for \code{llply} progress monitoring, default none; see {\code{plyr::create_progress_bar}}
-#' @return list containing data frame for each series, class \code{usfrbcpr}
+#' @title Extract the commercial paper rates (old) data.
+#' @description Extracts the commercial paper rates (old) series from the commercial paper data set.
+#' @inheritParams getCommercialPaperRates
+#' @return Returns a list containing data frame for each series, class \code{usfrbcpr}.
 #' @export
 #' @seealso \code{\link{getCommercialPaper}}, 
 #' \code{\link{getCommercialPaperRates}}, 
@@ -291,7 +308,7 @@ getCommercialPaperOutstandingOld <- function(cp,progressBar="none") {
 #' \code{\link{getCommercialPaperYearend}}, 
 #' \code{\link{mergeSeries}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' cp <- getCommercialPaper()
 #' rates <- getCommercialPaperRatesOld(cp,"text")
 #' summary(rates)
